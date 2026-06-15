@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export default function ScanButton() {
   const [scanning, setScanning] = useState(false);
-  const [result, setResult] = useState<{ newCount: number; sources: string[] } | null>(null);
+  const [result, setResult] = useState<{ newCount: number; sources: string[]; error?: string } | null>(null);
   const router = useRouter();
 
   async function handleScan() {
@@ -14,21 +14,25 @@ export default function ScanButton() {
     try {
       const res = await fetch('/api/scan', { method: 'POST' });
       const data = await res.json();
-      setResult({ newCount: data.newCount, sources: data.sources });
-      router.refresh();
-    } catch {
-      setResult({ newCount: 0, sources: [] });
+      if (!res.ok) {
+        setResult({ newCount: 0, sources: [], error: data.error || 'Scan failed' });
+        return;
+      }
+      setResult({ newCount: data.newCount ?? 0, sources: data.sources ?? [] });
+    } catch (err) {
+      setResult({ newCount: 0, sources: [], error: err instanceof Error ? err.message : 'Network error' });
     } finally {
       setScanning(false);
+      router.refresh();
     }
   }
 
   return (
     <div className="flex items-center gap-3">
       {result && (
-        <span className="text-sm text-emerald-400 font-medium">
-          +{result.newCount} new from {result.sources.join(', ')}
-        </span>
+        result.error
+          ? <span className="text-sm text-red-400 font-medium">Error: {result.error}</span>
+          : <span className="text-sm text-emerald-400 font-medium">+{result.newCount} new from {result.sources.join(', ') || '—'}</span>
       )}
       <button
         onClick={handleScan}
